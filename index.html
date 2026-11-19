@@ -415,6 +415,7 @@ function tick(){if(page!=="trk"||!signed)return;const r=reqs.find(x=>x.id===trkI
 setInterval(tick,400);
 /* ===== مدير الخرائط: خريطة واحدة دائمة لكل مفتاح، تُنقل بين إعادات الرسم ===== */
 const MAPS={};let MAPFAIL=false;
+const TILES=[["https://tile.openstreetmap.org/{z}/{x}/{y}.png","© مساهمو OpenStreetMap"],["https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}","© Esri · OpenStreetMap"]];
 const hasL=()=>!!window.L&&!MAPFAIL;
 const mapBox=(k,h)=>`<div class="lmap" data-map="${k}" style="height:${h}px"></div>`;
 const icon=(c,e,s)=>L.divIcon({className:"",html:`<div class="mk ${c}" style="width:${s}px;height:${s}px">${e}</div>`,iconSize:[s,s],iconAnchor:[s/2,s/2]});
@@ -441,8 +442,9 @@ const MAPDRAW={
   if(M.fit!==o.id){M.fit=o.id;M.map.fitBounds(L.latLngBounds([loc(o),...cs.slice(0,4).map(loc)]).pad(.3))}}};
 function mountMaps(){if(!hasL())return;document.querySelectorAll("[data-map]").forEach(ph=>{const k=ph.dataset.map;let M=MAPS[k];
  if(!M){const el=document.createElement("div");el.className="lmi";el.dir="ltr";ph.appendChild(el);const map=L.map(el,{scrollWheelZoom:false,attributionControl:true}).setView([23.9,45],5);
-  const tl=L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",{subdomains:"abcd",maxZoom:19,attribution:"© OpenStreetMap © CARTO"}).addTo(map);
-  let ok=false;tl.on("tileload",()=>ok=true);tl.on("tileerror",()=>setTimeout(()=>{if(!ok&&!MAPFAIL){MAPFAIL=true;render()}},3000));
+  /* خرائط مجانية بدون مفتاح: OpenStreetMap أولًا، ثم Esri احتياطيًا، ثم الخريطة المبسطة */
+  let ok=false,ti=0;const add=()=>{const T=TILES[ti],tl=L.tileLayer(T[0],{maxZoom:19,attribution:T[1]}).addTo(map);
+   tl.on("tileload",()=>ok=true);tl.on("tileerror",()=>setTimeout(()=>{if(ok||tl._dead)return;tl._dead=1;map.removeLayer(tl);if(++ti<TILES.length)add();else if(!MAPFAIL){MAPFAIL=true;render()}},2500))};add();
   M=MAPS[k]={el,map,g:L.layerGroup().addTo(map)}}else ph.appendChild(M.el);
  M.map.invalidateSize();try{MAPDRAW[k.split(":")[0]](M,k)}catch(e){console.error(e)}})}
 function trkPage(o){
